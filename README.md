@@ -109,11 +109,3 @@ Advanced analytics dashboard
 
 🤝 Contributing
 Contributions are welcome. Fork the repository, open a pull request, or submit new ideas via issues.
-
-📜 License
-This project is licensed under the MIT License.
-
-css
-Copy code
-
-If you want, I can also add badges, a logo, or screenshot sections.
