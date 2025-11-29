@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Installment System (API)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Font for modern UI -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+<div class="app-wrapper">
+
+  <!-- TOP BAR -->
+  <header class="topbar glass">
+    <div class="logo">
+      <span class="logo-dot"></span>
+      <div>
+        <div class="logo-title">Installment System</div>
+        <div class="logo-sub">(API Version)</div>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <button id="themeToggle" class="btn btn-ghost">
+        <i class="fa-solid fa-circle-half-stroke"></i>
+        <span>Theme</span>
+      </button>
+      <span id="userInfo" class="user-info"></span>
+      <button id="logoutBtn" class="btn btn-danger" style="display:none;">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        <span>Logout</span>
+      </button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+
+    <!-- SIDEBAR (Icons + Labels) -->
+    <aside class="sidebar glass" id="sidebar" style="display:none;">
+      <nav>
+        <a href="#dashboard">
+          <i class="fa-solid fa-chart-line"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="#customers">
+          <i class="fa-solid fa-users"></i>
+          <span>Customers</span>
+        </a>
+        <a href="#products">
+          <i class="fa-solid fa-box-open"></i>
+          <span>Products</span>
+        </a>
+        <a href="#plans">
+          <i class="fa-solid fa-file-invoice-dollar"></i>
+          <span>Plans</span>
+        </a>
+        <a href="#payments">
+          <i class="fa-solid fa-money-bill-transfer"></i>
+          <span>Payments</span>
+        </a>
+        <a href="#reports">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Reports</span>
+        </a>
+        <a href="#backup">
+          <i class="fa-solid fa-database"></i>
+          <span>Backup</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="content">
+
+      <!-- LOGIN -->
+      <section id="view-login">
+        <div class="login-wrapper">
+          <div class="login-box glass">
+            <h2>Welcome back 👋</h2>
+            <p class="login-sub">
+              Sign in to manage customers, installments & payments.
+            </p>
+
+            <div id="loginError" class="alert" style="display:none;"></div>
+
+            <label>Username</label>
+            <input type="text" id="loginUsername" placeholder="admin">
+
+            <label>Password</label>
+            <input type="password" id="loginPassword" placeholder="••••••">
+
+            <button id="loginBtn" class="btn btn-primary w-full">
+              <i class="fa-solid fa-arrow-right-to-bracket"></i>
+              <span>Login</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- DASHBOARD -->
+      <section id="view-dashboard" style="display:none;">
+        <div class="page-header">
+          <div>
+            <h1>Dashboard</h1>
+            <p>Quick overview of your installment business.</p>
+          </div>
+        </div>
+
+        <div class="cards-grid" id="dashboardCards"></div>
+
+        <div class="grid-2">
+          <div class="card glass">
+            <div class="card-header">
+              <h3>Monthly Collection</h3>
+              <span class="chip chip-blue">Yearly</span>
+            </div>
+            <canvas id="monthlyCollectionChart"></canvas>
+          </div>
+
+          <div class="card glass">
+            <div class="card-header">
+              <h3>Last 10 Payments</h3>
+            </div>
+            <table class="table" id="lastPaymentsTable"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- CUSTOMERS -->
+      <section id="view-customers" style="display:none;">
+        <div class="page-header">
+          <h1>Customers</h1>
+          <p>Manage your installment customers.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card glass">
+            <div class="card-header">
+              <h3>Add / Edit Customer</h3>
+            </div>
+
+            <input type="hidden" id="custId">
+
+            <label>Name</label>
+            <input type="text" id="custName">
+
+            <label>Phone</label>
+            <input type="text" id="custPhone">
+
+            <label>CNIC</label>
+            <input type="text" id="custCnic">
+
+            <label>Address</label>
+            <textarea id="custAddress"></textarea>
+
+            <div class="btn-row">
+              <button id="custSaveBtn" class="btn btn-primary">
+                <i class="fa-solid fa-floppy-disk"></i>
+                Save
+              </button>
+              <button id="custResetBtn" class="btn btn-ghost">Reset</button>
+            </div>
+          </div>
+
+          <div class="card glass">
+            <div class="card-header">
+              <h3>Customer List</h3>
+            </div>
+
+            <div class="search-row">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="custSearch" placeholder="Search…">
+            </div>
+
+            <div class="table-wrapper">
+              <table class="table" id="custTable"></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PRODUCTS -->
+      <section id="view-products" style="display:none;">
+        <div class="page-header">
+          <h1>Products</h1>
+          <p>Items sold on installments.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card glass">
+            <div class="card-header"><h3>Add / Edit Product</h3></div>
+
+            <input type="hidden" id="prodId">
+
+            <label>Name</label>
+            <input type="text" id="prodName">
+
+            <label>Price</label>
+            <input type="number" id="prodPrice">
+
+            <label>Description</label>
+            <textarea id="prodDesc"></textarea>
+
+            <div class="btn-row">
+              <button id="prodSaveBtn" class="btn btn-primary">Save</button>
+              <button id="prodResetBtn" class="btn btn-ghost">Reset</button>
+            </div>
+          </div>
+
+          <div class="card glass">
+            <div class="card-header"><h3>Product List</h3></div>
+
+            <div class="search-row">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="prodSearch" placeholder="Search…">
+            </div>
+
+            <div class="table-wrapper">
+              <table class="table" id="prodTable"></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PLANS -->
+      <section id="view-plans" style="display:none;">
+        <div class="page-header">
+          <h1>Installment Plans</h1>
+          <p>Create and manage plans.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card glass">
+            <div class="card-header">
+              <h3>Add / Edit Plan</h3>
+            </div>
+
+            <input type="hidden" id="planId">
+
+            <label>Customer</label>
+            <select id="planCustomer"></select>
+
+            <label>Product</label>
+            <select id="planProduct"></select>
+
+            <label>Total</label>
+            <input type="number" id="planTotal">
+
+            <label>Down Payment</label>
+            <input type="number" id="planDown">
+
+            <label>Schedule</label>
+            <select id="planSchedule">
+              <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+            </select>
+
+            <label>Installment Amount</label>
+            <input type="number" id="planInstallAmt">
+
+            <div class="btn-row">
+              <button id="planSaveBtn" class="btn btn-primary">
+                <i class="fa-solid fa-floppy-disk"></i>
+                Save
+              </button>
+              <button id="planResetBtn" class="btn btn-ghost">Reset</button>
+            </div>
+          </div>
+
+          <div class="card glass">
+            <div class="card-header">
+              <h3>Plans List</h3>
+            </div>
+
+            <div class="search-row">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <input type="text" id="planSearch" placeholder="Search…">
+            </div>
+
+            <div class="table-wrapper">
+              <table class="table" id="planTable"></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PAYMENTS -->
+      <section id="view-payments" style="display:none;">
+        <div class="page-header">
+          <h1>Payments</h1>
+          <p>Record installment collections.</p>
+        </div>
+
+        <div class="grid-2">
+          <div class="card glass">
+            <div class="card-header">
+              <h3>Add Payment</h3>
+            </div>
+
+            <label>Select Plan</label>
+            <select id="payPlan"></select>
+
+            <label>Amount</label>
+            <input type="number" id="payAmount">
+
+            <label>Note</label>
+            <input type="text" id="payNote">
+
+            <button id="payBtn" class="btn btn-primary w-full">
+              <i class="fa-solid fa-money-bill-transfer"></i>
+              Submit Payment
+            </button>
+          </div>
+
+          <div class="card glass">
+            <div class="card-header">
+              <h3>Payment History</h3>
+            </div>
+            <div class="table-wrapper">
+              <table class="table" id="payTable"></table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- REPORTS -->
+      <section id="view-reports" style="display:none;">
+        <div class="page-header">
+          <h1>Reports</h1>
+        </div>
+
+        <div class="card glass">
+          <h3>Daily Report</h3>
+          <button id="dailyReportBtn" class="btn btn-primary">Today</button>
+          <div class="table-wrapper">
+            <table class="table" id="dailyReportTable"></table>
+          </div>
+        </div>
+
+        <div class="card glass">
+          <h3>Monthly Report</h3>
+          <button id="monthlyReportBtn" class="btn btn-primary">All Months</button>
+          <div class="table-wrapper">
+            <table class="table" id="monthlyReportTable"></table>
+          </div>
+        </div>
+
+        <div class="card glass">
+          <h3>Customer Wise Report</h3>
+          <div class="inline-row">
+            <select id="reportCust"></select>
+            <button id="custReportBtn" class="btn btn-primary">View</button>
+          </div>
+          <div class="table-wrapper">
+            <table class="table" id="custReportTable"></table>
+          </div>
+        </div>
+      </section>
+
+      <!-- BACKUP -->
+      <section id="view-backup" style="display:none;">
+        <div class="page-header">
+          <h1>Backup</h1>
+          <p>Export & restore database safely.</p>
+        </div>
+
+        <div class="card glass">
+          <h3>Download Backup</h3>
+          <button id="backupExportBtn" class="btn btn-primary">Download .SQL</button>
+        </div>
+
+        <div class="card glass">
+          <h3>Restore Backup</h3>
+          <input type="file" id="backupFile" accept=".sql">
+          <button id="backupRestoreBtn" class="btn btn-primary" style="margin-top:10px;">Restore</button>
+          <p id="backupMsg" class="backup-msg"></p>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <footer class="footer">
+    © <span id="year"></span> Installment System API
+  </footer>
+</div>
+
+<script src="assets/js/app.js"></script>
+</body>
+</html>
