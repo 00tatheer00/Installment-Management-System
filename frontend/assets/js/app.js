@@ -1,22 +1,133 @@
-const API_BASE = "http://localhost/installment_api_clean/api";
+/**
+ * API base: optional <meta name="ims-api-base" content="https://host/path/api"> overrides.
+ * Otherwise resolves ../api from the current page (works for /frontend/ or subdirectory installs).
+ */
+function getApiBase() {
+    const meta = document.querySelector('meta[name="ims-api-base"]');
+    const raw = meta ? meta.getAttribute("content").trim() : "";
+    const base = raw.length > 0
+        ? raw
+        : new URL("../api", window.location.href).href;
+    return base.replace(/\/+$/, "");
+}
+
+const API_BASE = getApiBase();
+
+const IMS_NOTIFY_KEY = "ims_desktop_notify";
+
+function toastBase() {
+    const dark = document.body.classList.contains("dark");
+    return {
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 4200,
+        timerProgressBar: true,
+        didOpen: (toast) => {
+            toast.addEventListener("mouseenter", Swal.stopTimer);
+            toast.addEventListener("mouseleave", Swal.resumeTimer);
+        },
+        customClass: { popup: "ims-toast-theme" },
+        background: dark ? "#1e293b" : "#ffffff",
+        color: dark ? "#e2e8f0" : "#1f2937"
+    };
+}
+
+function toastSuccess(title, text) {
+    Swal.fire({ ...toastBase(), icon: "success", title, text: text || undefined });
+}
+
+function toastError(title, text) {
+    Swal.fire({ ...toastBase(), icon: "error", title, text: text || undefined, timer: 6500 });
+}
+
+function toastInfo(title, text) {
+    Swal.fire({ ...toastBase(), icon: "info", title, text: text || undefined });
+}
+
+function toastWarning(title, text) {
+    Swal.fire({ ...toastBase(), icon: "warning", title, text: text || undefined });
+}
+
+function tryDesktopNotify(title, body) {
+    if (localStorage.getItem(IMS_NOTIFY_KEY) !== "1") return;
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    try {
+        new Notification(title, { body: body || "", tag: "ims-app" });
+    } catch (_) {}
+}
+
+function initNotifyToggle() {
+    const cb = document.getElementById("notifyDesktopToggle");
+    if (!cb) return;
+    cb.checked = localStorage.getItem(IMS_NOTIFY_KEY) === "1";
+    cb.addEventListener("change", async () => {
+        if (cb.checked) {
+            if (!("Notification" in window)) {
+                cb.checked = false;
+                toastError("Not supported", "Desktop alerts are not available in this browser.");
+                return;
+            }
+            const perm = await Notification.requestPermission();
+            if (perm === "granted") {
+                localStorage.setItem(IMS_NOTIFY_KEY, "1");
+                toastSuccess("Desktop alerts on", "You will receive notifications for sign-in and important updates.");
+                tryDesktopNotify("Installment Suite", "Desktop notifications are enabled.");
+            } else {
+                cb.checked = false;
+                localStorage.setItem(IMS_NOTIFY_KEY, "0");
+                toastInfo("Permission needed", "Allow notifications in your browser settings to enable desktop alerts.");
+            }
+        } else {
+            localStorage.setItem(IMS_NOTIFY_KEY, "0");
+            toastInfo("Desktop alerts off", "We will only show in-app toasts.");
+        }
+    });
+}
+
+function setLoginBusy(busy) {
+    const btn = document.getElementById("loginBtn");
+    if (!btn) return;
+    btn.disabled = busy;
+    const label = btn.querySelector("span");
+    if (label) label.textContent = busy ? "Signing in…" : "Continue";
+}
 
 /* --------------------- API HELPER --------------------- */
 async function api(path, options = {}) {
-    const res = await fetch(API_BASE + path, {
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        ...options
-    });
-
-    if (!res.ok) {
-        let msg = "Error " + res.status;
-        try {
-            const j = await res.json();
-            msg = j.message || msg;
-        } catch {}
+    let res;
+    try {
+        res = await fetch(API_BASE + path, {
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            ...options
+        });
+    } catch (err) {
+        const msg = err && err.message === "Failed to fetch"
+            ? "Cannot reach the server. Check your connection and API URL."
+            : (err && err.message) || "Network error";
         throw new Error(msg);
     }
-    return res.json();
+
+    const rawText = await res.text();
+    let data = null;
+    try {
+        data = rawText ? JSON.parse(rawText) : {};
+    } catch {
+        const snippet = rawText.replace(/\s+/g, " ").slice(0, 80);
+        if (rawText.trim().startsWith("<")) {
+            throw new Error(
+                "Server returned HTML instead of JSON. Usually a PHP error or wrong URL. Check the API path and PHP error log."
+            );
+        }
+        throw new Error(snippet ? `Invalid response: ${snippet}` : "Empty response from server.");
+    }
+
+    if (!res.ok) {
+        const msg = (data && (data.message || data.error)) || `Request failed (${res.status})`;
+        throw new Error(msg);
+    }
+    return data;
 }
 
 /* --------------------- MAIN INIT --------------------- */
@@ -24,6 +135,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("year").textContent = new Date().getFullYear();
 
     setupTheme();
+    initNotifyToggle();
     initAuth();
 
     window.addEventListener("hashchange", handleRoute);
@@ -38,6 +150,7 @@ function setupTheme() {
     document.getElementById("themeToggle").onclick = () => {
         body.classList.toggle("dark");
         localStorage.setItem("theme", body.classList.contains("dark") ? "dark" : "light");
+        document.dispatchEvent(new CustomEvent("ims-theme-change"));
     };
 }
 
@@ -45,6 +158,31 @@ function setupTheme() {
 async function initAuth() {
     document.getElementById("loginBtn").onclick = login;
     document.getElementById("logoutBtn").onclick = logout;
+
+    const loginUser = document.getElementById("loginUsername");
+    const loginPass = document.getElementById("loginPassword");
+    if (loginUser && loginPass) {
+        loginUser.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") loginPass.focus();
+        });
+        loginPass.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") login();
+        });
+    }
+
+    const togglePw = document.getElementById("toggleLoginPassword");
+    if (togglePw && loginPass) {
+        const icon = togglePw.querySelector("i");
+        togglePw.addEventListener("click", () => {
+            const show = loginPass.type === "password";
+            loginPass.type = show ? "text" : "password";
+            togglePw.setAttribute("aria-label", show ? "Hide password" : "Show password");
+            togglePw.setAttribute("aria-pressed", show ? "true" : "false");
+            if (icon) {
+                icon.className = show ? "fa-solid fa-eye-slash" : "fa-solid fa-eye";
+            }
+        });
+    }
 
     try {
         const res = await api("/auth/me.php", { method: "GET" });
@@ -63,9 +201,13 @@ async function initAuth() {
 async function login() {
     const u = document.getElementById("loginUsername").value.trim();
     const p = document.getElementById("loginPassword").value;
-    const errBox = document.getElementById("loginError");
-    errBox.style.display = "none";
 
+    if (!u || !p) {
+        toastWarning("Missing fields", "Enter your username or email and password.");
+        return;
+    }
+
+    setLoginBusy(true);
     try {
         const res = await api("/auth/login.php", {
             method: "POST",
@@ -73,26 +215,29 @@ async function login() {
         });
 
         if (res.status === "success") {
-            Swal.fire("Success", "Login successful!", "success");
+            toastSuccess("Signed in", `Welcome back, ${res.user.name}.`);
+            tryDesktopNotify("Signed in", `Hello, ${res.user.name}`);
             setLoggedIn(res.user);
             location.hash = "#dashboard";
             handleRoute();
         } else {
-            errBox.textContent = res.message || "Login failed";
-            errBox.style.display = "block";
+            toastError("Login failed", res.message || "Invalid credentials.");
         }
-
     } catch (e) {
-        errBox.textContent = e.message;
-        errBox.style.display = "block";
+        toastError("Sign-in error", e.message || "Something went wrong.");
+    } finally {
+        setLoginBusy(false);
     }
 }
 
 /* --------------------- LOGOUT --------------------- */
 async function logout() {
-    await api("/auth/logout.php", { method: "POST" });
+    try {
+        await api("/auth/logout.php", { method: "POST" });
+    } catch (_) {}
 
-    Swal.fire("Logged Out", "You have been logged out.", "info");
+    toastInfo("Signed out", "Your session has ended.");
+    tryDesktopNotify("Signed out", "You have been logged out of Installment Suite.");
 
     setLoggedOut();
     location.hash = "#login";
@@ -101,6 +246,7 @@ async function logout() {
 
 /* --------------------- LOGIN/LOGOUT UI STATE --------------------- */
 function setLoggedIn(user) {
+    document.body.classList.remove("auth-guest");
     document.getElementById("userInfo").textContent = `${user.name} (${user.role})`;
     document.getElementById("logoutBtn").style.display = "inline-block";
     document.getElementById("sidebar").style.display = "block";
@@ -108,6 +254,7 @@ function setLoggedIn(user) {
 }
 
 function setLoggedOut() {
+    document.body.classList.add("auth-guest");
     document.getElementById("userInfo").textContent = "";
     document.getElementById("logoutBtn").style.display = "none";
     document.getElementById("sidebar").style.display = "none";
@@ -291,14 +438,14 @@ async function saveCustomer() {
         address: document.getElementById("custAddress").value.trim()
     };
 
-    if (!data.name) return Swal.fire("Error", "Customer name required", "error");
+    if (!data.name) return toastWarning("Customer name required", "Please enter a name before saving.");
 
     await api("/customers.php", {
         method: id ? "PUT" : "POST",
         body: JSON.stringify({ id, ...data })
     });
 
-    Swal.fire("Saved", "Customer updated!", "success");
+    toastSuccess("Customer saved", "Your changes were stored.");
     ["custId", "custName", "custPhone", "custCnic", "custAddress"]
         .forEach(id => document.getElementById(id).value = "");
 
@@ -322,10 +469,10 @@ async function deleteCustomer(id) {
                 method: "DELETE",
                 body: JSON.stringify({ id })
             });
-            Swal.fire("Deleted!", "Customer has been deleted.", "success");
+            toastSuccess("Customer removed", "The customer record was deleted.");
             renderCustomers(document.getElementById("custSearch").value.trim());
         } catch (e) {
-            Swal.fire("Error", e.message, "error");
+            toastError("Could not delete", e.message);
         }
     }
 }
@@ -396,10 +543,10 @@ async function deleteProduct(id) {
                 method: "DELETE",
                 body: JSON.stringify({ id })
             });
-            Swal.fire("Deleted!", "Product has been deleted.", "success");
+            toastSuccess("Product removed", "The product was deleted.");
             renderProducts(document.getElementById("prodSearch").value.trim());
         } catch (e) {
-            Swal.fire("Error", e.message, "error");
+            toastError("Could not delete", e.message);
         }
     }
 }
@@ -412,14 +559,14 @@ async function saveProduct() {
         description: document.getElementById("prodDesc").value
     };
 
-    if (!data.name) return Swal.fire("Error", "Product name required", "error");
+    if (!data.name) return toastWarning("Product name required", "Enter a name before saving.");
 
     await api("/products.php", {
         method: id ? "PUT" : "POST",
         body: JSON.stringify({ id, ...data })
     });
 
-    Swal.fire("Saved", "Product updated!", "success");
+    toastSuccess("Product saved", "Your changes were stored.");
     ["prodId", "prodName", "prodPrice", "prodDesc"]
         .forEach(id => document.getElementById(id).value = "");
 
@@ -516,10 +663,10 @@ async function deletePlan(id) {
                 method: "DELETE",
                 body: JSON.stringify({ id })
             });
-            Swal.fire("Deleted!", "Plan has been deleted.", "success");
+            toastSuccess("Plan removed", "The plan and related payment rows were deleted.");
             renderPlans(document.getElementById("planSearch").value.trim());
         } catch (e) {
-            Swal.fire("Error", e.message, "error");
+            toastError("Could not delete", e.message);
         }
     }
 }
@@ -536,7 +683,7 @@ async function savePlan() {
     };
 
     if (!data.customer_id || !data.product_id || data.total_amount <= 0) {
-        return Swal.fire("Error", "Please fill all required fields", "error");
+        return toastWarning("Incomplete plan", "Select customer, product, and a valid total amount.");
     }
 
     await api("/plans.php", {
@@ -544,7 +691,7 @@ async function savePlan() {
         body: JSON.stringify({ id, ...data })
     });
 
-    Swal.fire("Saved", id ? "Plan updated!" : "Plan added!", "success");
+    toastSuccess(id ? "Plan updated" : "Plan created", id ? "Changes were saved." : "The new plan is live.");
     ["planId", "planCustomer", "planProduct", "planTotal", "planDown", "planSchedule", "planInstallAmt"]
         .forEach(id => document.getElementById(id).value = "");
 
@@ -610,10 +757,10 @@ async function deletePayment(id) {
                 method: "DELETE",
                 body: JSON.stringify({ id })
             });
-            Swal.fire("Deleted!", "Payment has been deleted.", "success");
+            toastSuccess("Payment removed", "The payment was deleted and balances adjusted.");
             renderPayments();
         } catch (e) {
-            Swal.fire("Error", e.message, "error");
+            toastError("Could not delete", e.message);
         }
     }
 }
@@ -626,12 +773,12 @@ async function savePayment() {
     };
 
     if (!data.plan_id || data.amount <= 0) {
-        return Swal.fire("Error", "Please select a plan and enter amount", "error");
+        return toastWarning("Payment incomplete", "Choose a plan and enter a valid amount.");
     }
 
     await api("/payments.php", { method: "POST", body: JSON.stringify(data) });
 
-    Swal.fire("Saved", "Payment Added!", "success");
+    toastSuccess("Payment recorded", "The installment payment was saved.");
     document.getElementById("payAmount").value = "";
     document.getElementById("payNote").value = "";
 

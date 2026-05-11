@@ -17,7 +17,7 @@ if ($method === 'GET') {
     json_response(['status' => 'success', 'data' => $res->fetch_all(MYSQLI_ASSOC)]);
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
+$data = read_json_input();
 
 if ($method === 'POST') {
     $plan_id = (int)($data['plan_id'] ?? 0);

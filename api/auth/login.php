@@ -1,6 +1,9 @@
 <?php
 require_once __DIR__ . '/../../core/db.php';
 require_once __DIR__ . '/../../core/response.php';
+require_once __DIR__ . '/../../core/dev_seed_admin.php';
+
+ims_dev_seed_default_admin($conn);
 
 header('Content-Type: application/json');
 
@@ -8,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['status' => 'error', 'message' => 'Method not allowed'], 405);
 }
 
-$input = json_decode(file_get_contents('php://input'), true);
+$input = read_json_input();
 $username = trim($input['username'] ?? '');
 $password = $input['password'] ?? '';
 

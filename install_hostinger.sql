@@ -1,8 +1,7 @@
-CREATE DATABASE IF NOT EXISTS installment_system
-  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE installment_system;
+-- Hostinger-safe installer (run inside selected DB, no CREATE DATABASE/USE).
+-- In phpMyAdmin first select your DB (e.g. u204364970_ims), then import this file.
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -11,7 +10,7 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE customers (
+CREATE TABLE IF NOT EXISTS customers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
     phone VARCHAR(20),
@@ -20,7 +19,7 @@ CREATE TABLE customers (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE products (
+CREATE TABLE IF NOT EXISTS products (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
     description TEXT,
@@ -28,7 +27,7 @@ CREATE TABLE products (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE plans (
+CREATE TABLE IF NOT EXISTS plans (
     id INT AUTO_INCREMENT PRIMARY KEY,
     customer_id INT NOT NULL,
     product_id INT NOT NULL,
@@ -46,7 +45,7 @@ CREATE TABLE plans (
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
 
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     plan_id INT NOT NULL,
     amount DECIMAL(10,2) NOT NULL,
@@ -56,8 +55,26 @@ CREATE TABLE payments (
     FOREIGN KEY (plan_id) REFERENCES plans(id) ON DELETE CASCADE
 );
 
-INSERT INTO users (name, username, password, role) VALUES
-('Super Admin', 'admin',
-'$2y$10$G.sCf3M6294B/VRrQhECH.Qx7NOgJ9H8Bdny1007X83Lwh9KVBseK', 'admin'),
-('Tatheer', 'tatheer@tech4edges.com',
-'$2y$10$QPT6INs/bj23squB3Nn69e2o/q4ivuRZltDvkGTwOLU2YRs9BYZN2', 'admin');
+INSERT INTO users (name, username, password, role)
+VALUES (
+    'Super Admin',
+    'admin',
+    '$2y$10$G.sCf3M6294B/VRrQhECH.Qx7NOgJ9H8Bdny1007X83Lwh9KVBseK',
+    'admin'
+)
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    password = VALUES(password),
+    role = VALUES(role);
+
+INSERT INTO users (name, username, password, role)
+VALUES (
+    'Tatheer',
+    'tatheer@tech4edges.com',
+    '$2y$10$QPT6INs/bj23squB3Nn69e2o/q4ivuRZltDvkGTwOLU2YRs9BYZN2',
+    'admin'
+)
+ON DUPLICATE KEY UPDATE
+    name = VALUES(name),
+    password = VALUES(password),
+    role = VALUES(role);
